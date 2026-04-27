@@ -1,18 +1,72 @@
-# HealthCore
-=======
-# React + Vite
+# HealthCore Medical System (Frontend)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Welcome to the **HealthCore Medical System** frontend repository! This is a modern, responsive React application built with Vite and Tailwind CSS. It is designed to handle multiple user roles (Patients, Doctors, Pharmacists, and Admins) navigating a unified healthcare platform.
 
-Currently, two official plugins are available:
+## 🚀 Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Framework:** React 19
+- **Build Tool:** Vite
+- **Routing:** React Router DOM (v7)
+- **Styling:** Tailwind CSS (v4)
+- **State Management:** React Context API (Auth Context & Outlet Context)
+- **Linting:** ESLint
 
-## React Compiler
+## 📁 Project Structure
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```text
+sdp-frontend/
+├── public/                 # Static assets (favicon, etc.)
+└── src/
+    ├── assets/             # Images, fonts, SVG icons
+    ├── components/         # Reusable UI components (buttons, inputs)
+    ├── context/            # React Context providers (AuthContext)
+    ├── pages/              # Role-specific dashboard pages
+    │   ├── admin/          # Admin views (Patients, Settings, Logs)
+    │   ├── auth/           # Login & Registration flows
+    │   ├── doctor/         # Doctor views (Schedule, Prescriptions)
+    │   ├── patient/        # Patient views (Appointments, Records)
+    │   └── pharmacist/     # Pharmacy views (Inventory, Orders)
+    ├── routes/             # Route guards (ProtectedRoute.jsx)
+    ├── App.jsx             # Main router configuration
+    ├── index.css           # Global Tailwind and base styles
+    └── main.jsx            # React mounting point
+```
 
-## Expanding the ESLint configuration
+## 🛠️ Getting Started
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+To get a local copy up and running, follow these simple steps.
+
+### Prerequisites
+
+Ensure you have **Node.js** installed (v18+ recommended).
+
+### Installation
+
+1. Clone the repository and navigate to the project directory:
+   ```bash
+   cd sdp-frontend
+   ```
+
+2. Install NPM packages:
+   ```bash
+   npm install
+   ```
+
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+4. Open your browser and visit `http://localhost:5173`.
+
+## 🔐 Demo Credentials
+
+Use the seeded backend users below (Password is always `123456`):
+- **Admin (1 user):** `admin@admin.com`
+- **Doctor (2 users):** `rahul@doctor.com`, `sarah@doctor.com`
+- **Patient (3 users):** `john@patient.com`, `alice@patient.com`, `bob@patient.com`
+- **Pharmacy (1 user):** `healthplus@pharmacy.com`
+
+## 📚 Learning Guide
+
+If you're a developer looking to understand how this project is built from the ground up, please refer to the [LEARNING_GUIDE.md](./LEARNING_GUIDE.md) document included in this directory!

@@ -2,32 +2,52 @@ import { useState } from 'react';
 import { useOutletContext, Link, useNavigate } from 'react-router-dom';
 
 const DoctorSchedule = () => {
-    const { schedule: scheduleData, updateAppointmentStatus, rescheduleAppointment, patients } = useOutletContext();
+    const { schedule: scheduleData, updateAppointmentStatus, rescheduleAppointment, createAppointment, patients } = useOutletContext();
     const navigate = useNavigate();
 
     const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
-    const [rescheduleData, setRescheduleData] = useState({ oldTime: '', newTime: '', newDate: '' });
+    const [isAddBookingOpen, setIsAddBookingOpen] = useState(false);
+    const [bookingData, setBookingData] = useState({ patientId: '', date: '', time: '', type: 'Virtual', duration: 30 });
+    const [rescheduleData, setRescheduleData] = useState({ appointmentId: '', newTime: '', newDate: '' });
 
     // Convert object to array and sort by time (simplified sorting for display purposes)
-    const appointmentsLayout = Object.entries(scheduleData).map(([time, data]) => ({ time, ...data }));
+    const appointmentsLayout = Object.values(scheduleData);
 
     const handleJoinCall = () => {
         navigate('/doctor/consultation-room');
     };
 
-    const handleDone = (time) => {
-        updateAppointmentStatus(time, 'completed');
+    const handleDone = (appointmentId) => {
+        updateAppointmentStatus(appointmentId, 'COMPLETED');
     };
 
-    const openRescheduleModal = (time) => {
-        setRescheduleData({ oldTime: time, newTime: '', newDate: '' });
+    const openRescheduleModal = (appointmentId) => {
+        setRescheduleData({ appointmentId, newTime: '', newDate: '' });
         setIsRescheduleOpen(true);
     };
 
     const submitReschedule = (e) => {
         e.preventDefault();
-        rescheduleAppointment(rescheduleData.oldTime, rescheduleData.newTime, rescheduleData.newDate);
+        rescheduleAppointment(rescheduleData.appointmentId, rescheduleData.newTime, rescheduleData.newDate);
         setIsRescheduleOpen(false);
+    };
+
+    const submitBooking = async (e) => {
+        e.preventDefault();
+        try {
+            await createAppointment({
+                patientId: parseInt(bookingData.patientId, 10),
+                date: bookingData.date,
+                time: bookingData.time,
+                type: bookingData.type,
+                duration: bookingData.duration
+            });
+            setIsAddBookingOpen(false);
+            setBookingData({ patientId: '', date: '', time: '', type: 'Virtual', duration: 30 });
+        } catch (err) {
+            alert('Failed to book appointment');
+            console.error(err);
+        }
     };
 
     // Helper to find patient id
@@ -40,12 +60,12 @@ const DoctorSchedule = () => {
         <div>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Today's Appointments</h2>
-                    <p className="text-gray-500 mt-1">Manage your consultations for the day.</p>
+                    <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Upcoming Appointments</h2>
+                    <p className="text-gray-500 mt-1">Manage all your scheduled consultations.</p>
                 </div>
 
                 <div className="flex flex-wrap gap-4 items-center w-full md:w-auto">
-                    <button className="flex-1 md:flex-none bg-[#E10600] text-white hover:bg-red-700 px-5 py-2.5 rounded-xl font-bold transition shadow-sm flex items-center justify-center gap-2">
+                    <button onClick={() => setIsAddBookingOpen(true)} className="flex-1 md:flex-none bg-[#E10600] text-white hover:bg-red-700 px-5 py-2.5 rounded-xl font-bold transition shadow-sm flex items-center justify-center gap-2">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                         New Appointment
                     </button>
@@ -102,7 +122,7 @@ const DoctorSchedule = () => {
                                             </Link>
 
                                             {appt.status !== 'completed' && (
-                                                <button onClick={() => openRescheduleModal(appt.time)} className="text-xs font-bold border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-lg transition shadow-sm flex items-center gap-1.5 focus:outline-none">
+                                                <button onClick={() => openRescheduleModal(appt.id)} className="text-xs font-bold border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-lg transition shadow-sm flex items-center gap-1.5 focus:outline-none">
                                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                                                     Reschedule
                                                 </button>
@@ -110,7 +130,7 @@ const DoctorSchedule = () => {
 
                                             {appt.status !== 'completed' && (
                                                 <button
-                                                    onClick={() => handleDone(appt.time)}
+                                                    onClick={() => handleDone(appt.id)}
                                                     className="text-xs font-bold border-green-200 bg-green-50 hover:bg-green-100 text-green-700 px-3 py-2 rounded-lg transition shadow-sm border focus:outline-none"
                                                 >
                                                     Done
@@ -178,6 +198,67 @@ const DoctorSchedule = () => {
                         <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-2xl">
                             <button onClick={() => setIsRescheduleOpen(false)} className="px-5 py-2.5 text-sm font-bold text-gray-600 hover:text-gray-900 transition">Cancel</button>
                             <button type="submit" form="reschedule-form" className="px-5 py-2.5 text-sm font-bold text-white bg-[#E10600] rounded-xl shadow-sm hover:bg-red-700 transition">Confirm Time</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Booking Modal */}
+            {isAddBookingOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center overflow-auto bg-gray-900/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto flex flex-col">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+                            <h2 className="text-xl font-bold text-gray-900">Book New Appointment</h2>
+                            <button onClick={() => setIsAddBookingOpen(false)} className="text-gray-400 hover:text-gray-600 outline-none">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+                        <div className="p-6 flex-1">
+                            <form id="booking-form" onSubmit={submitBooking} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Select Patient</label>
+                                    <select required value={bookingData.patientId} onChange={e => setBookingData({ ...bookingData, patientId: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-red-500 bg-white">
+                                        <option value="" disabled>Choose patient...</option>
+                                        {patients.map(p => (
+                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-1.5">Date</label>
+                                        <input required type="date" value={bookingData.date} onChange={e => setBookingData({ ...bookingData, date: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-red-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-1.5">Time</label>
+                                        <select required value={bookingData.time} onChange={e => setBookingData({ ...bookingData, time: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-red-500 bg-white">
+                                            <option value="" disabled>Select time...</option>
+                                            <option value="09:00 AM">09:00 AM</option>
+                                            <option value="09:30 AM">09:30 AM</option>
+                                            <option value="10:00 AM">10:00 AM</option>
+                                            <option value="10:30 AM">10:30 AM</option>
+                                            <option value="11:00 AM">11:00 AM</option>
+                                            <option value="01:00 PM">01:00 PM</option>
+                                            <option value="01:30 PM">01:30 PM</option>
+                                            <option value="02:00 PM">02:00 PM</option>
+                                            <option value="02:30 PM">02:30 PM</option>
+                                            <option value="03:00 PM">03:00 PM</option>
+                                            <option value="04:00 PM">04:00 PM</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Consultation Type</label>
+                                    <select required value={bookingData.type} onChange={e => setBookingData({ ...bookingData, type: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-red-500 bg-white">
+                                        <option value="Virtual">Virtual</option>
+                                        <option value="In-Person">In-Person</option>
+                                    </select>
+                                </div>
+                            </form>
+                        </div>
+                        <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-2xl">
+                            <button onClick={() => setIsAddBookingOpen(false)} className="px-5 py-2.5 text-sm font-bold text-gray-600 hover:text-gray-900 transition">Cancel</button>
+                            <button type="submit" form="booking-form" className="px-5 py-2.5 text-sm font-bold text-white bg-[#E10600] rounded-xl shadow-sm hover:bg-red-700 transition">Book Appointment</button>
                         </div>
                     </div>
                 </div>

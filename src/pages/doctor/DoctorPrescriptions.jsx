@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation, useOutletContext } from 'react-router-dom';
 
 const DoctorPrescriptions = () => {
-    const { prescriptions, addPrescription, updatePrescription, patients } = useOutletContext();
+    const { prescriptions, addPrescription, updatePrescription, updatePrescriptionStatus, patients } = useOutletContext();
     const location = useLocation();
 
     // View State: 'dashboard' or 'create'
@@ -72,46 +72,74 @@ const DoctorPrescriptions = () => {
         setView('create');
     };
 
-    const handleSubmit = (status) => {
-        setIsSubmitting(true);
-        const patient = patients.find(p => p.id === selectedPatientId);
+    const handleSubmit = async (status) => {
+        const patientIdNum = parseInt(selectedPatientId, 10);
+        if (!selectedPatientId || Number.isNaN(patientIdNum)) {
+            alert('Please select a patient.');
+            return;
+        }
 
-        setTimeout(() => {
-            const rxPayload = {
-                id: editingRxId || `RX-${Math.floor(1000 + Math.random() * 9000)}`,
-                patientName: patient ? patient.name : 'Unknown Patient',
-                patientId: selectedPatientId,
-                date: new Date().toISOString().split('T')[0],
-                status: status,
-                medications: medications.filter(m => m.medName.trim() !== '').map(m => ({
+        setIsSubmitting(true);
+        try {
+            const medPayload = medications
+                .filter((m) => m.medName.trim() !== '')
+                .map((m) => ({
                     name: m.medName,
                     dosage: m.dosage,
                     frequency: m.frequency,
                     duration: m.duration,
-                    notes: m.notes
-                })),
-                additionalInstructions,
-                followUpDate
-            };
+                    notes: m.notes || null,
+                }));
 
             if (editingRxId) {
-                updatePrescription(rxPayload);
+                if (status === 'Sent') {
+                    await updatePrescriptionStatus(editingRxId, 'Sent');
+                    alert('Prescription sent to pharmacy.');
+                } else {
+                    updatePrescription({
+                        id: editingRxId,
+                        patientId: patientIdNum,
+                        patientName: patients.find((p) => Number(p.id) === patientIdNum)?.name,
+                        date: new Date().toISOString().split('T')[0],
+                        status: 'Draft',
+                        medications: medPayload.map((m) => ({ ...m, medName: m.name })),
+                        additionalInstructions: additionalInstructions.trim() || null,
+                        followUpDate: followUpDate || null,
+                    });
+                    alert('Draft updated locally. The server does not support editing draft prescriptions yet; refresh may reset changes.');
+                }
             } else {
-                addPrescription(rxPayload);
+                await addPrescription({
+                    patientId: patientIdNum,
+                    date: new Date().toISOString().split('T')[0],
+                    status: status === 'Sent' ? 'SENT' : 'DRAFT',
+                    medications: medPayload,
+                    additionalInstructions: additionalInstructions.trim() || null,
+                    followUpDate: followUpDate || null,
+                });
+                alert(status === 'Sent' ? 'Prescription sent to pharmacy.' : 'Draft saved.');
             }
 
-            alert(`Prescription ${status === 'Sent' ? 'sent to pharmacy' : 'saved as draft'} successfully.`);
-
-            // Reset form
             resetForm();
-            setIsSubmitting(false);
             setView('dashboard');
-        }, 800);
+        } catch (err) {
+            const msg = err.response?.data?.error || err.message || 'Failed to save prescription';
+            alert(msg);
+            console.error(err);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
-    const filteredPrescriptions = prescriptions.filter(rx => {
-        const matchesStatus = filterStatus === 'All' || rx.status === filterStatus;
-        const matchesSearch = (rx.patientName || '').toLowerCase().includes(searchQuery.toLowerCase()) || rx.id.toLowerCase().includes(searchQuery.toLowerCase());
+    const filteredPrescriptions = prescriptions.filter((rx) => {
+        const st = (rx.status || '').toUpperCase();
+        const matchesStatus =
+            filterStatus === 'All' ||
+            (filterStatus === 'Sent' && st === 'SENT') ||
+            (filterStatus === 'Draft' && st === 'DRAFT');
+        const q = searchQuery.toLowerCase();
+        const matchesSearch =
+            (rx.patientName || '').toLowerCase().includes(q) || String(rx.id || '').toLowerCase().includes(q);
         return matchesStatus && matchesSearch;
     });
 
@@ -186,12 +214,15 @@ const DoctorPrescriptions = () => {
                                         </td>
                                         <td className="p-5">
                                             <p className="text-sm text-gray-600 truncate max-wxs">
-                                                {rx.medications.map(m => m.name || m.medName).join(', ')}
+                                                {(rx.medications || [])
+                                                    .map((m) => (typeof m === 'string' ? m : m?.name || m?.medName || ''))
+                                                    .filter(Boolean)
+                                                    .join(', ')}
                                             </p>
                                         </td>
                                         <td className="p-5">
                                             <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider
-                                                ${rx.status === 'Sent' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-yellow-50 text-yellow-700 border border-yellow-100'}
+                                                ${(rx.status || '').toUpperCase() === 'SENT' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-yellow-50 text-yellow-700 border border-yellow-100'}
                                             `}>
                                                 {rx.status}
                                             </span>
@@ -199,7 +230,7 @@ const DoctorPrescriptions = () => {
                                         <td className="p-5 text-right">
                                             <div className="flex justify-end gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                                                 <button onClick={() => handleEditDraft(rx)} className="text-xs font-bold bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg transition shadow-sm">View</button>
-                                                {rx.status === 'Draft' && (
+                                                {(rx.status || '').toUpperCase() === 'DRAFT' && (
                                                     <button onClick={() => handleEditDraft(rx)} className="text-xs font-bold text-[#E10600] border border-red-100 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition shadow-sm">Edit</button>
                                                 )}
                                             </div>

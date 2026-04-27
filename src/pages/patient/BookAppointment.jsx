@@ -1,47 +1,67 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
+import doctorService from '../../services/doctorService';
 
 const BookAppointment = () => {
     const { addAppointment } = useOutletContext();
     const navigate = useNavigate();
 
+    const [doctors, setDoctors] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [selectedDepartment, setSelectedDepartment] = useState('');
     const [selectedDoctor, setSelectedDoctor] = useState('');
     const [selectedDate, setSelectedDate] = useState('');
     const [selectedTime, setSelectedTime] = useState('');
+    const [appointmentType, setAppointmentType] = useState('VIRTUAL');
+    const [error, setError] = useState(null);
 
-    const doctors = [
-        { id: 'd1', name: 'Dr. Sarah Jenkins', specialty: 'General Practice', department: 'general' },
-        { id: 'd2', name: 'Dr. Michael Chen', specialty: 'Cardiology', department: 'cardiology' },
-        { id: 'd3', name: 'Dr. Emily Rodriguez', specialty: 'Dermatology', department: 'dermatology' },
-    ];
+    useEffect(() => {
+        const fetchDoctors = async () => {
+            try {
+                setLoading(true);
+                const data = await doctorService.getAllDoctors(null, null, 0, 100);
+                setDoctors(data.content || []);
+            } catch (err) {
+                console.error("Failed to load doctors:", err);
+                setError("Failed to load doctors");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchDoctors();
+    }, []);
 
     // Filter doctors based on department
     const filteredDoctors = selectedDepartment
         ? doctors.filter(doc => doc.department === selectedDepartment)
         : doctors;
 
-    const handleBooking = (e) => {
+    const handleBooking = async (e) => {
         e.preventDefault();
-        const doc = doctors.find(d => d.id === selectedDoctor);
-        if (doc) {
-            addAppointment({
-                doctor: doc.name,
-                date: selectedDate, // In real app, format this nicely
+        try {
+            await addAppointment({
+                doctorId: selectedDoctor,
+                date: selectedDate,
                 time: selectedTime,
-                type: "Virtual", // Mocking default to Virtual for now
-                status: "Upcoming"
+                type: appointmentType
             });
-            alert(`Appointment successfully booked with ${doc.name}!`);
+            alert(`Appointment successfully booked!`);
             navigate('/patient/dashboard');
+        } catch (err) {
+            alert('Failed to book appointment.');
         }
     };
+
+    if (loading) {
+        return <div className="p-8 text-center text-gray-500">Loading booking portal...</div>;
+    }
 
     return (
         <div>
             <h2 className="text-3xl font-bold text-gray-800 mb-6 tracking-tight">Book an Appointment</h2>
 
             <div className="bg-white border rounded-2xl shadow-sm p-6 lg:p-8">
+                {error && <div className="mb-4 text-red-500 bg-red-50 p-3 rounded-lg border border-red-200">{error}</div>}
                 <form onSubmit={handleBooking} className="space-y-8">
 
                     <div>
@@ -72,11 +92,11 @@ const BookAppointment = () => {
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold">
-                                            {doctor.name.charAt(4)}
+                                            {doctor.name ? doctor.name.charAt(4).toUpperCase() : 'D'}
                                         </div>
                                         <div>
                                             <p className="font-bold text-gray-800 text-sm">{doctor.name}</p>
-                                            <p className="text-xs text-gray-500 font-medium">{doctor.specialty}</p>
+                                            <p className="text-xs text-gray-500 font-medium">{doctor.specialization}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -90,7 +110,7 @@ const BookAppointment = () => {
                     </div>
 
                     {selectedDoctor && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t border-gray-100">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-4 border-t border-gray-100">
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">Select Date</label>
                                 <input
@@ -99,6 +119,7 @@ const BookAppointment = () => {
                                     onChange={(e) => setSelectedDate(e.target.value)}
                                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 focus:ring-2 focus:ring-red-500 focus:bg-white outline-none transition-all cursor-pointer"
                                     required
+                                    min={new Date().toISOString().split('T')[0]}
                                 />
                             </div>
                             <div>
@@ -115,6 +136,18 @@ const BookAppointment = () => {
                                     <option value="10:00 AM">10:00 AM</option>
                                     <option value="11:00 AM">11:00 AM</option>
                                     <option value="02:00 PM">02:00 PM</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Type</label>
+                                <select
+                                    value={appointmentType}
+                                    onChange={(e) => setAppointmentType(e.target.value)}
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 focus:ring-2 focus:ring-red-500 focus:bg-white outline-none transition-all cursor-pointer"
+                                    required
+                                >
+                                    <option value="VIRTUAL">Virtual</option>
+                                    <option value="IN_PERSON">In Person</option>
                                 </select>
                             </div>
                         </div>

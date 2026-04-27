@@ -32,14 +32,12 @@ const DoctorPatientRecords = () => {
     const handleAddSubmit = (e) => {
         e.preventDefault();
         const newPatient = {
-            id: `PAT-${Math.floor(1000 + Math.random() * 9000)}`,
             name: formData.name,
             age: parseInt(formData.age, 10),
             gender: formData.gender,
             contact: formData.contact,
-            allergies: formData.allergies ? formData.allergies.split(',').map(s => s.trim()) : ['None'],
-            history: formData.history || 'No established history',
-            labs: []
+            allergies: formData.allergies || 'None',
+            medicalHistory: formData.history || 'No established history',
         };
         addPatient(newPatient);
         setSelectedPatientId(newPatient.id);
@@ -152,8 +150,8 @@ const DoctorPatientRecords = () => {
                                     </h3>
                                 </div>
                                 <div className="flex flex-wrap gap-2 mb-8">
-                                    {selectedPatient.allergies.map((allergy, idx) => (
-                                        <span key={idx} className="bg-red-50 text-red-700 border border-red-100 px-3 py-1.5 rounded-lg text-sm font-bold">{allergy}</span>
+                                    {(typeof selectedPatient.allergies === 'string' ? selectedPatient.allergies.split(',') : (selectedPatient.allergies || [])).map((allergy, idx) => (
+                                        <span key={idx} className="bg-red-50 text-red-700 border border-red-100 px-3 py-1.5 rounded-lg text-sm font-bold">{typeof allergy === 'string' ? allergy.trim() : allergy}</span>
                                     ))}
                                 </div>
 
@@ -162,7 +160,7 @@ const DoctorPatientRecords = () => {
                                     Medical History
                                 </h3>
                                 <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
-                                    <p className="text-sm font-medium text-gray-700">{selectedPatient.history}</p>
+                                    <p className="text-sm font-medium text-gray-700">{selectedPatient.medicalHistory || selectedPatient.history || 'No established history.'}</p>
                                 </div>
                                 <div className="mt-4 border-t border-gray-100 pt-6">
                                     <Link to="/doctor/records" className="text-sm font-bold text-[#E10600] flex items-center gap-1 hover:underline">

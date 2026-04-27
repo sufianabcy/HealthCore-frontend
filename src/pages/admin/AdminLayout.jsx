@@ -1,62 +1,54 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import adminService from '../../services/adminService';
 
 const AdminLayout = () => {
     const { logout } = useAuth();
     const navigate = useNavigate();
 
-    // 1. Global State: Patients
-    const [patients, setPatients] = useState([
-        { id: 'PAT-8492', name: 'John Doe', age: 41, contact: '+1 (555) 019-8472', status: 'Active', registrationDate: '2023-10-15' },
-        { id: 'PAT-8493', name: 'Alice Smith', age: 34, contact: '+1 (555) 019-8473', status: 'Active', registrationDate: '2023-10-18' },
-        { id: 'PAT-8494', name: 'Robert Johnson', age: 52, contact: '+1 (555) 019-8474', status: 'Suspended', registrationDate: '2023-10-20' },
-    ]);
+    const [patients, setPatients] = useState([]);
+    const [doctors, setDoctors] = useState([]);
+    const [pharmacies, setPharmacies] = useState([]);
+    const [appointments, setAppointments] = useState([]);
+    const [prescriptions, setPrescriptions] = useState([]);
+    const [logs, setLogs] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    // 2. Global State: Doctors
-    const [doctors, setDoctors] = useState([
-        { id: 'DOC-102', name: 'Dr. Sarah Jenkins', specialization: 'Cardiology', license: 'MD-849201', status: 'Verified', joinDate: '2023-01-12' },
-        { id: 'DOC-103', name: 'Dr. Michael Chen', specialization: 'General Practice', license: 'MD-849202', status: 'Verified', joinDate: '2023-03-05' },
-        { id: 'DOC-104', name: 'Dr. Emily Rodriguez', specialization: 'Pediatrics', license: 'MD-849203', status: 'Pending', joinDate: '2023-10-25' },
-        { id: 'DOC-105', name: 'Dr. James Wilson', specialization: 'Neurology', license: 'MD-849204', status: 'Suspended', joinDate: '2022-11-20' },
-    ]);
+    // Fetch all admin data from backend
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                const [patientsData, doctorsData, pharmaciesData, appointmentsData, prescriptionsData, logsData] = await Promise.all([
+                    adminService.getPatients(),
+                    adminService.getDoctors(),
+                    adminService.getPharmacies(),
+                    adminService.getAppointments(),
+                    adminService.getPrescriptions(),
+                    adminService.getLogs(),
+                ]);
+                setPatients(patientsData.content || []);
+                setDoctors(doctorsData.content || []);
+                setPharmacies(pharmaciesData.content || []);
+                setAppointments(appointmentsData.content || []);
+                setPrescriptions(prescriptionsData.content || []);
+                setLogs(logsData.content || []);
+            } catch (err) {
+                console.error('Failed to load admin data:', err);
+                setError('Failed to load data');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
 
-    // 3. Global State: Pharmacies
-    const [pharmacies, setPharmacies] = useState([
-        { id: 'PHARM-4192', name: 'CVS Pharmacy #4192', license: 'PH-9921', contact: '555-0100', status: 'Active' },
-        { id: 'PHARM-4193', name: 'Walgreens #104', license: 'PH-9922', contact: '555-0101', status: 'Pending' },
-    ]);
-
-    // Helper for mock dates
-    const today = new Date();
-    const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
-    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-
-    // 4. Global State: Appointments
-    const [appointments, setAppointments] = useState([
-        { id: 'APT-924', patient: 'John Doe', doctor: 'Dr. Sarah Jenkins', date: today.toISOString(), status: 'Upcoming' },
-        { id: 'APT-925', patient: 'Alice Smith', doctor: 'Dr. Michael Chen', date: today.toISOString(), status: 'Active' },
-        { id: 'APT-926', patient: 'Robert Johnson', doctor: 'Dr. Emily Rodriguez', date: yesterday.toISOString(), status: 'Completed' },
-        { id: 'APT-927', patient: 'Anonymous', doctor: 'Dr. James Wilson', date: tomorrow.toISOString(), status: 'Cancelled' },
-    ]);
-
-    // 5. Global State: Prescriptions
-    const [prescriptions, setPrescriptions] = useState([
-        { id: 'RX-1042', patient: 'John Doe', doctor: 'Dr. Sarah Jenkins', pharmacy: 'CVS Pharmacy #4192', status: 'Pending', flagged: false },
-        { id: 'RX-1043', patient: 'Robert Johnson', doctor: 'Dr. Michael Chen', pharmacy: 'Walgreens #104', status: 'Dispensed', flagged: false },
-        { id: 'RX-1044', patient: 'Alice Smith', doctor: 'Dr. James Wilson', pharmacy: 'Pending Assignment', status: 'Draft', flagged: true },
-    ]);
-
-    // 6. Global State: System Logs
-    const [logs, setLogs] = useState([
-        { id: 'LOG-1', user: 'System', action: 'Daily Backup Completed', timestamp: new Date(Date.now() - 3600000).toISOString() },
-        { id: 'LOG-2', user: 'Admin', action: 'Suspended PAT-8494', timestamp: new Date(Date.now() - 7200000).toISOString() },
-        { id: 'LOG-3', user: 'Admin', action: 'Approved DOC-102', timestamp: new Date(Date.now() - 86400000).toISOString() },
-    ]);
-
-    // --- State Mutation Handlers with Logs ---
+    // --- State Mutation Handlers with API calls ---
 
     const addLog = (action) => {
+        // Logs are created server-side; this is for optimistic UI updates
         setLogs(prev => [{
             id: `LOG-${Date.now()}`,
             user: 'Admin',
@@ -65,46 +57,57 @@ const AdminLayout = () => {
         }, ...prev]);
     };
 
-    const togglePatientStatus = (id) => {
-        setPatients(prev => prev.map(p => {
-            if (p.id === id) return { ...p, status: p.status === 'Active' ? 'Suspended' : 'Active' };
-            return p;
-        }));
-        const p = patients.find(p => p.id === id);
-        if (p) addLog(`Changed patient ${id} status to ${p.status === 'Active' ? 'Suspended' : 'Active'}`);
+    const togglePatientStatus = async (id) => {
+        try {
+            const patient = patients.find(p => p.id === id);
+            const newStatus = patient?.status === 'Active' ? 'Suspended' : 'Active';
+            await adminService.updatePatientStatus(id, newStatus);
+            setPatients(prev => prev.map(p => p.id === id ? { ...p, status: newStatus } : p));
+            addLog(`Changed patient ${id} status to ${newStatus}`);
+        } catch (err) {
+            console.error('Failed to toggle patient status:', err);
+        }
     };
 
-    const updateDoctorStatus = (id, newStatus) => {
-        setDoctors(prev => prev.map(d => {
-            if (d.id === id) return { ...d, status: newStatus };
-            return d;
-        }));
-        addLog(`Changed doctor ${id} status to ${newStatus}`);
+    const updateDoctorStatus = async (id, newStatus) => {
+        try {
+            await adminService.updateDoctorStatus(id, newStatus);
+            setDoctors(prev => prev.map(d => d.id === id ? { ...d, status: newStatus } : d));
+            addLog(`Changed doctor ${id} status to ${newStatus}`);
+        } catch (err) {
+            console.error('Failed to update doctor status:', err);
+        }
     };
 
-    const updatePharmacyStatus = (id, newStatus) => {
-        setPharmacies(prev => prev.map(p => {
-            if (p.id === id) return { ...p, status: newStatus };
-            return p;
-        }));
-        addLog(`Changed pharmacy ${id} status to ${newStatus}`);
+    const updatePharmacyStatus = async (id, newStatus) => {
+        try {
+            await adminService.updatePharmacyStatus(id, newStatus);
+            setPharmacies(prev => prev.map(p => p.id === id ? { ...p, status: newStatus } : p));
+            addLog(`Changed pharmacy ${id} status to ${newStatus}`);
+        } catch (err) {
+            console.error('Failed to update pharmacy status:', err);
+        }
     };
 
-    const cancelAppointment = (id) => {
-        setAppointments(prev => prev.map(a => {
-            if (a.id === id) return { ...a, status: 'Cancelled' };
-            return a;
-        }));
-        addLog(`Cancelled appointment ${id}`);
+    const cancelAppointment = async (appointmentId) => {
+        try {
+            await adminService.cancelAppointment(appointmentId);
+            setAppointments(prev => prev.map(a => a.id === appointmentId ? { ...a, status: 'Cancelled' } : a));
+            addLog(`Cancelled appointment ${appointmentId}`);
+        } catch (err) {
+            console.error('Failed to cancel appointment:', err);
+        }
     };
 
-    const togglePrescriptionFlag = (id) => {
-        setPrescriptions(prev => prev.map(p => {
-            if (p.id === id) return { ...p, flagged: !p.flagged };
-            return p;
-        }));
-        const pr = prescriptions.find(p => p.id === id);
-        if (pr) addLog(`${!pr.flagged ? 'Flagged' : 'Unflagged'} prescription ${id}`);
+    const togglePrescriptionFlag = async (prescriptionId) => {
+        try {
+            await adminService.togglePrescriptionFlag(prescriptionId);
+            setPrescriptions(prev => prev.map(p => p.id === prescriptionId ? { ...p, flagged: !p.flagged } : p));
+            const pr = prescriptions.find(p => p.id === prescriptionId);
+            addLog(`${!pr?.flagged ? 'Flagged' : 'Unflagged'} prescription ${prescriptionId}`);
+        } catch (err) {
+            console.error('Failed to toggle prescription flag:', err);
+        }
     };
 
     // --- Layout & Navigation UI ---
@@ -216,14 +219,24 @@ const AdminLayout = () => {
                 {/* Page Content */}
                 <main className="flex-1 overflow-y-auto bg-gray-50">
                     <div className="p-6 md:p-8">
-                        <Outlet context={{
-                            patients, togglePatientStatus,
-                            doctors, updateDoctorStatus,
-                            pharmacies, updatePharmacyStatus,
-                            appointments, cancelAppointment,
-                            prescriptions, togglePrescriptionFlag,
-                            logs, addLog
-                        }} />
+                        {loading ? (
+                            <div className="flex items-center justify-center h-64">
+                                <div className="h-8 w-8 border-4 border-gray-200 border-t-[#E10600] rounded-full animate-spin"></div>
+                            </div>
+                        ) : error ? (
+                            <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 text-center font-medium">
+                                {error}
+                            </div>
+                        ) : (
+                            <Outlet context={{
+                                patients, togglePatientStatus,
+                                doctors, updateDoctorStatus,
+                                pharmacies, updatePharmacyStatus,
+                                appointments, cancelAppointment,
+                                prescriptions, togglePrescriptionFlag,
+                                logs, addLog
+                            }} />
+                        )}
                     </div>
                 </main>
             </div>

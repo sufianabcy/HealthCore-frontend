@@ -1,65 +1,101 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import pharmacyService from '../../services/pharmacyService';
 
 const PharmacistLayout = () => {
     const { logout } = useAuth();
-    // Shared state for prescriptions
-    const [prescriptions, setPrescriptions] = useState([
-        { id: 'RX-1042', patient: 'John Doe', doctor: 'Dr. Sarah Jenkins', medication: 'Amoxicillin 500mg', instructions: 'Take 1 capsule every 8 hours for 7 days', status: 'Pending', date: '2023-10-24' },
-        { id: 'RX-1043', patient: 'Robert Johnson', doctor: 'Dr. Michael Chen', medication: 'Lisinopril 10mg', instructions: 'Take 1 tablet daily', status: 'Pending', date: '2023-10-24' },
-        { id: 'RX-1040', patient: 'Alice Smith', doctor: 'Dr. Michael Chen', medication: 'Metformin 500mg', instructions: 'Take 1 tablet twice daily with meals', status: 'Verified', date: '2023-10-24' },
-        { id: 'RX-1038', patient: 'Sarah Williams', doctor: 'Dr. Emily Rodriguez', medication: 'Levothyroxine 50mcg', instructions: 'Take 1 tablet daily on an empty stomach', status: 'Verified', date: '2023-10-23' },
-        { id: 'RX-1035', patient: 'William Blake', doctor: 'Dr. Sarah Jenkins', medication: 'Atorvastatin 20mg', instructions: 'Take 1 tablet daily at bedtime', status: 'Dispensed', date: '2023-10-23' },
-    ]);
-
-    // Shared state for orders
-    const [orders, setOrders] = useState([
-        { id: 'ORD-5092', patient: 'Alice Smith', status: 'Processing', date: '2023-10-24', method: 'Pickup' },
-        { id: 'ORD-5091', patient: 'Sarah Williams', status: 'Ready to Ship', date: '2023-10-24', method: 'Delivery' },
-        { id: 'ORD-5088', patient: 'William Blake', status: 'Completed', date: '2023-10-23', method: 'Pickup' },
-    ]);
-
-    // Shared state for inventory
-    const [inventory, setInventory] = useState([
-        { id: 'MED-001', name: 'Amoxicillin 500mg', stock: 450, status: 'In Stock' },
-        { id: 'MED-002', name: 'Lisinopril 10mg', stock: 12, status: 'Low Stock' },
-        { id: 'MED-003', name: 'Metformin 500mg', stock: 850, status: 'In Stock' },
-        { id: 'MED-004', name: 'Albuterol Inhaler', stock: 0, status: 'Out of Stock' },
-        { id: 'MED-005', name: 'Ibuprofen 800mg', stock: 320, status: 'In Stock' },
-    ]);
-
+    const [prescriptions, setPrescriptions] = useState([]);
+    const [orders, setOrders] = useState([]);
+    const [inventory, setInventory] = useState([]);
     const [isOnline, setIsOnline] = useState(true);
     const [profileOpen, setProfileOpen] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    const updatePrescriptionStatus = (id, newStatus) => {
-        setPrescriptions(prev => prev.map(p => p.id === id ? { ...p, status: newStatus } : p));
-    };
-
-    const updateOrderStatus = (id, newStatus) => {
-        setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
-    };
-
-    const updateInventoryStock = (id, amount) => {
-        setInventory(prev => prev.map(i => {
-            if (i.id === id) {
-                const newStock = Math.max(0, i.stock + amount);
-                const newStatus = newStock === 0 ? 'Out of Stock' : (newStock < 50 ? 'Low Stock' : 'In Stock');
-                return { ...i, stock: newStock, status: newStatus };
+    // Fetch all pharmacy data from backend
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                const [rxData, ordersData, inventoryData, profileData] = await Promise.all([
+                    pharmacyService.getPrescriptions(),
+                    pharmacyService.getOrders(),
+                    pharmacyService.getInventory(),
+                    pharmacyService.getProfile(),
+                ]);
+                setPrescriptions(rxData.content || []);
+                setOrders(ordersData.content || []);
+                setInventory(inventoryData.content || []);
+                setIsOnline(profileData.online ?? true);
+            } catch (err) {
+                console.error('Failed to load pharmacy data:', err);
+                setError('Failed to load data');
+            } finally {
+                setLoading(false);
             }
-            return i;
-        }));
+        };
+        fetchData();
+    }, []);
+
+    const updatePrescriptionStatus = async (prescriptionId, newStatus) => {
+        try {
+            if (newStatus === 'Verified') {
+                await pharmacyService.verifyPrescription(prescriptionId);
+            } else if (newStatus === 'Dispensed') {
+                await pharmacyService.dispensePrescription(prescriptionId);
+            }
+            setPrescriptions(prev => prev.map(p => p.id === prescriptionId ? { ...p, status: newStatus } : p));
+        } catch (err) {
+            console.error('Failed to update prescription:', err);
+        }
     };
 
-    const addInventoryItem = (item) => {
-        setInventory(prev => [
-            {
-                id: `MED-${Math.floor(100 + Math.random() * 900)}`,
-                status: item.stock === 0 ? 'Out of Stock' : (item.stock < 50 ? 'Low Stock' : 'In Stock'),
-                ...item
-            },
-            ...prev
-        ]);
+    const updateOrderStatus = async (orderId, newStatus) => {
+        try {
+            await pharmacyService.updateOrderStatus(orderId, newStatus);
+            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+        } catch (err) {
+            console.error('Failed to update order:', err);
+        }
+    };
+
+    const updateInventoryStock = async (itemId, amount) => {
+        try {
+            const item = inventory.find(i => i.id === itemId);
+            const newQuantity = Math.max(0, (item?.stock || 0) + amount);
+            await pharmacyService.updateStock(itemId, newQuantity);
+            setInventory(prev => prev.map(i => {
+                if (i.id === itemId) {
+                    const newStock = Math.max(0, i.stock + amount);
+                    const newStatus = newStock === 0 ? 'Out of Stock' : (newStock < 50 ? 'Low Stock' : 'In Stock');
+                    return { ...i, stock: newStock, status: newStatus };
+                }
+                return i;
+            }));
+        } catch (err) {
+            console.error('Failed to update stock:', err);
+        }
+    };
+
+    const addInventoryItem = async (item) => {
+        try {
+            const created = await pharmacyService.addInventoryItem(item);
+            setInventory(prev => [created, ...prev]);
+            return created;
+        } catch (err) {
+            console.error('Failed to add inventory item:', err);
+            throw err;
+        }
+    };
+
+    const handleToggleStatus = async () => {
+        try {
+            const updated = await pharmacyService.toggleStatus();
+            setIsOnline(updated.online ?? !isOnline);
+        } catch (err) {
+            console.error('Failed to toggle status:', err);
+        }
     };
 
     return (
@@ -118,7 +154,7 @@ const PharmacistLayout = () => {
                         </button>
                         <div className="hidden sm:block">
                             <div className="flex items-center gap-2">
-                                <h2 className="text-lg font-bold text-gray-800 tracking-tight">CVS Pharmacy #4192</h2>
+                                <h2 className="text-lg font-bold text-gray-800 tracking-tight">Pharmacy Portal</h2>
                                 <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></span>
                                 <span className="text-sm font-medium text-gray-500">{isOnline ? 'Online' : 'Offline'}</span>
                             </div>
@@ -138,7 +174,7 @@ const PharmacistLayout = () => {
 
                             {profileOpen && (
                                 <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-100 rounded-xl shadow-lg py-2 z-50">
-                                    <button onClick={() => setIsOnline(!isOnline)} className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                    <button onClick={handleToggleStatus} className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
                                         Set status to {isOnline ? 'Offline' : 'Online'}
                                     </button>
                                     <div className="border-t border-gray-100 my-1"></div>
@@ -152,7 +188,17 @@ const PharmacistLayout = () => {
                 </header>
 
                 <main className="flex-1 overflow-y-auto p-6 md:p-8">
-                    <Outlet context={{ prescriptions, updatePrescriptionStatus, orders, updateOrderStatus, inventory, updateInventoryStock, addInventoryItem }} />
+                    {loading ? (
+                        <div className="flex items-center justify-center h-64">
+                            <div className="h-8 w-8 border-4 border-gray-200 border-t-[#E10600] rounded-full animate-spin"></div>
+                        </div>
+                    ) : error ? (
+                        <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 text-center font-medium">
+                            {error}
+                        </div>
+                    ) : (
+                        <Outlet context={{ prescriptions, updatePrescriptionStatus, orders, updateOrderStatus, inventory, updateInventoryStock, addInventoryItem }} />
+                    )}
                 </main>
             </div>
         </div>

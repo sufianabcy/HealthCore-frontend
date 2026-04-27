@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 
 const PatientConsultations = () => {
     const { appointments } = useOutletContext();
-    const virtualAppointments = appointments.filter(a => a.type === 'Virtual');
+    const virtualAppointments = appointments.filter(a => a.type === 'Virtual' || a.type === 'VIRTUAL');
 
     const [inCall, setInCall] = useState(false);
 
@@ -57,7 +57,7 @@ const PatientConsultations = () => {
                                         🏥
                                     </div>
                                     <div>
-                                        <p className="font-bold text-gray-800 text-lg mb-1">{appt.doctor}</p>
+                                        <p className="font-bold text-gray-800 text-lg mb-1">{appt.doctorName}</p>
                                         <div className="flex flex-wrap items-center gap-2">
                                             <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-md font-bold uppercase tracking-wide">Ready to Join</span>
                                             <span className="text-sm text-gray-500 font-medium">Scheduled: {appt.date} at {appt.time}</span>

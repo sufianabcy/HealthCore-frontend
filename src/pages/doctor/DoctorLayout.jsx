@@ -1,123 +1,147 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import doctorService from '../../services/doctorService';
+import commonService from '../../services/commonService';
 
 const DoctorLayout = () => {
     const { logout } = useAuth();
-    // Shared state for the doctor's schedule
-    const [schedule, setSchedule] = useState({
-        "10:00 AM": { id: 1, patient: "Emily Rodriguez", type: "Follow-up", status: "completed" },
-        "10:30 AM": { id: 2, patient: "John Doe", type: "General Checkup", status: "next" },
-        "11:15 AM": { id: 3, patient: "Alice Smith", type: "Consultation", status: "upcoming" },
-        "02:00 PM": { id: 4, patient: "Robert Johnson", type: "Review Results", status: "upcoming" },
-        "03:30 PM": { id: 5, patient: "William Blake", type: "New Patient", status: "upcoming" },
-    });
-
-    const [patients, setPatients] = useState([
-        {
-            id: 'PAT-1042',
-            name: 'John Doe',
-            age: 45,
-            gender: 'Male',
-            contact: '+1 (555) 123-4567',
-            allergies: ['Penicillin', 'Peanuts'],
-            history: 'Hypertension, Type 2 Diabetes',
-            labs: [
-                { date: 'Oct 20, 2023', name: 'Comprehensive Metabolic Panel', result: 'Normal' },
-                { date: 'Oct 20, 2023', name: 'Lipid Panel', result: 'Elevated' }
-            ]
-        },
-        {
-            id: 'PAT-1043',
-            name: 'Alice Smith',
-            age: 32,
-            gender: 'Female',
-            contact: '+1 (555) 987-6543',
-            allergies: ['Sulfa drugs'],
-            history: 'Asthma, Migraines',
-            labs: [
-                { date: 'Sep 15, 2023', name: 'Complete Blood Count', result: 'Normal' }
-            ]
-        },
-        {
-            id: 'PAT-1044',
-            name: 'Emily Rodriguez',
-            age: 28,
-            gender: 'Female',
-            contact: '+1 (555) 246-8135',
-            allergies: ['None'],
-            history: 'No significant past medical history',
-            labs: []
-        },
-        {
-            id: 'PAT-1045',
-            name: 'Robert Johnson',
-            age: 58,
-            gender: 'Male',
-            contact: '+1 (555) 369-1472',
-            allergies: ['Latex'],
-            history: 'Osteoarthritis, Hyperlipidemia',
-            labs: [
-                { date: 'Oct 22, 2023', name: 'A1C', result: '6.8%' }
-            ]
-        },
-        {
-            id: 'PAT-1046',
-            name: 'William Blake',
-            age: 41,
-            gender: 'Male',
-            contact: '+1 (555) 852-9630',
-            allergies: ['Dairy'],
-            history: 'GERD',
-            labs: []
-        },
-    ]);
-
-    const [prescriptions, setPrescriptions] = useState([
-        { id: 'RX-1042', patientId: 'PAT-1042', patientName: 'John Doe', date: 'Oct 24, 2023', medications: [{ name: 'Amoxicillin', dosage: '500mg', frequency: '3x daily', duration: '7 days' }], status: 'Sent' },
-        { id: 'RX-1043', patientId: 'PAT-1045', patientName: 'Robert Johnson', date: 'Oct 23, 2023', medications: [{ name: 'Lisinopril', dosage: '10mg', frequency: '1x daily', duration: '30 days' }], status: 'Draft' }
-    ]);
-
+    const [schedule, setSchedule] = useState({});
+    const [patients, setPatients] = useState([]);
+    const [prescriptions, setPrescriptions] = useState([]);
     const [isOnline, setIsOnline] = useState(true);
     const [profileOpen, setProfileOpen] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    const updateAppointmentStatus = (time, newStatus) => {
-        setSchedule(prev => ({
-            ...prev,
-            [time]: { ...prev[time], status: newStatus }
-        }));
-    };
-
-    const rescheduleAppointment = (oldTime, newTime, newDate) => {
-        setSchedule(prev => {
-            const newSchedule = { ...prev };
-            if (newSchedule[oldTime]) {
-                const apptToMove = { ...newSchedule[oldTime], status: 'upcoming' };
-                delete newSchedule[oldTime];
-                newSchedule[newTime] = apptToMove;
-            }
-            return newSchedule;
+    const mapScheduleToState = (scheduleData) => {
+        const scheduleMap = {};
+        (scheduleData.content || []).forEach((appt) => {
+            scheduleMap[String(appt.id)] = {
+                ...appt,
+                patient: appt.patientName,
+                type: appt.type === 'IN_PERSON' ? 'In-Person' : 'Virtual',
+                status: appt.status.toLowerCase(),
+            };
         });
+        return scheduleMap;
     };
 
-    const addPatient = (newPatient) => {
-        setPatients(prev => [...prev, newPatient]);
+    const loadSchedule = useCallback(async () => {
+        const scheduleData = await doctorService.getSchedule();
+        setSchedule(mapScheduleToState(scheduleData));
+    }, []);
+
+    // Fetch all doctor data from backend
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                const [scheduleData, patientsData, prescriptionsData, profileData] = await Promise.all([
+                    doctorService.getSchedule(),
+                    doctorService.getPatients(),
+                    doctorService.getPrescriptions(),
+                    doctorService.getProfile(),
+                ]);
+
+                setSchedule(mapScheduleToState(scheduleData));
+                setPatients(patientsData.content || []);
+                setPrescriptions(prescriptionsData.content || []);
+                setIsOnline(profileData.online ?? true);
+            } catch (err) {
+                console.error('Failed to load doctor data:', err);
+                setError('Failed to load data');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    const updateAppointmentStatus = async (appointmentId, newStatus) => {
+        try {
+            const statusForApi = String(newStatus || '').toUpperCase();
+            await commonService.updateAppointmentStatus(appointmentId, statusForApi);
+            await loadSchedule();
+        } catch (err) {
+            console.error('Failed to update appointment status:', err);
+        }
+    };
+
+    const createAppointment = async (apptData) => {
+        try {
+            await doctorService.createAppointment(apptData);
+            await loadSchedule();
+        } catch (err) {
+            console.error('Failed to create appointment:', err);
+            throw err;
+        }
+    };
+
+    const rescheduleAppointment = async (appointmentId, newTime, newDate) => {
+        try {
+            await commonService.rescheduleAppointment(appointmentId, { date: newDate, time: newTime });
+            await loadSchedule();
+        } catch (err) {
+            console.error('Failed to reschedule appointment:', err);
+        }
+    };
+
+    const addPatient = async (newPatient) => {
+        try {
+            const created = await doctorService.addPatient(newPatient);
+            setPatients(prev => [...prev, created]);
+            return created;
+        } catch (err) {
+            console.error('Failed to add patient:', err);
+            throw err;
+        }
     };
 
     const updatePatient = (updatedPatient) => {
         setPatients(prev => prev.map(p => p.id === updatedPatient.id ? updatedPatient : p));
     };
 
-    const addPrescription = (newRx) => {
-        setPrescriptions(prev => [newRx, ...prev]);
+    const addPrescription = async (newRx) => {
+        try {
+            const created = await doctorService.createPrescription(newRx);
+            setPrescriptions(prev => [created, ...prev]);
+            return created;
+        } catch (err) {
+            console.error('Failed to create prescription:', err);
+            throw err;
+        }
     };
 
-    const updatePrescriptionStatus = (id, status) => {
-        setPrescriptions(prev => prev.map(p => p.id === id ? { ...p, status } : p));
+    const updatePrescriptionStatus = async (prescriptionId, status) => {
+        try {
+            if (status === 'Sent') {
+                const updated = await doctorService.sendPrescription(prescriptionId);
+                setPrescriptions((prev) =>
+                    prev.map((p) => (p.id === prescriptionId ? { ...p, ...updated } : p))
+                );
+            } else {
+                setPrescriptions((prev) =>
+                    prev.map((p) => (p.id === prescriptionId ? { ...p, status } : p))
+                );
+            }
+        } catch (err) {
+            console.error('Failed to update prescription status:', err);
+            throw err;
+        }
     };
 
     const updatePrescription = (updatedRx) => {
         setPrescriptions(prev => prev.map(p => p.id === updatedRx.id ? updatedRx : p));
+    };
+
+    const handleToggleStatus = async () => {
+        try {
+            const updated = await doctorService.toggleStatus();
+            setIsOnline(updated.online ?? !isOnline);
+        } catch (err) {
+            console.error('Failed to toggle status:', err);
+        }
     };
 
     return (
@@ -143,7 +167,7 @@ const DoctorLayout = () => {
                         </NavLink>
                         <NavLink to="/doctor/schedule" className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all ${isActive ? 'bg-red-50 text-[#E10600]' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}>
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                            Today's Appointments
+                            Upcoming Appointments
                         </NavLink>
                         <NavLink to="/doctor/patients" className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all ${isActive ? 'bg-red-50 text-[#E10600]' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}>
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
@@ -154,7 +178,7 @@ const DoctorLayout = () => {
                             Medical Records
                         </NavLink>
                         <NavLink to="/doctor/prescriptions" className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all ${isActive ? 'bg-red-50 text-[#E10600]' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                             E-Prescriptions
                         </NavLink>
                     </nav>
@@ -184,7 +208,7 @@ const DoctorLayout = () => {
                         </button>
                         <div className="hidden sm:block">
                             <div className="flex items-center gap-2">
-                                <h2 className="text-lg font-bold text-gray-800 tracking-tight">Dr. Sarah Jenkins</h2>
+                                <h2 className="text-lg font-bold text-gray-800 tracking-tight">Doctor Portal</h2>
                                 <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></span>
                                 <span className="text-sm font-medium text-gray-500">{isOnline ? 'Online' : 'Offline'}</span>
                             </div>
@@ -199,12 +223,12 @@ const DoctorLayout = () => {
 
                         <div className="relative">
                             <button onClick={() => setProfileOpen(!profileOpen)} className="flex items-center gap-3 focus:outline-none">
-                                <img src="https://ui-avatars.com/api/?name=Sarah+Jenkins&background=E10600&color=fff" alt="Profile" className="w-9 h-9 rounded-full border border-gray-100" />
+                                <img src="https://ui-avatars.com/api/?name=Doctor&background=E10600&color=fff" alt="Profile" className="w-9 h-9 rounded-full border border-gray-100" />
                             </button>
 
                             {profileOpen && (
                                 <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-100 rounded-xl shadow-lg py-2 z-50">
-                                    <button onClick={() => setIsOnline(!isOnline)} className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                    <button onClick={handleToggleStatus} className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
                                         Set status to {isOnline ? 'Offline' : 'Online'}
                                     </button>
                                     <div className="border-t border-gray-100 my-1"></div>
@@ -218,11 +242,21 @@ const DoctorLayout = () => {
                 </header>
 
                 <main className="flex-1 overflow-y-auto p-6 md:p-8">
-                    <Outlet context={{
-                        schedule, updateAppointmentStatus, rescheduleAppointment,
-                        patients, addPatient, updatePatient,
-                        prescriptions, addPrescription, updatePrescriptionStatus, updatePrescription
-                    }} />
+                    {loading ? (
+                        <div className="flex items-center justify-center h-64">
+                            <div className="h-8 w-8 border-4 border-gray-200 border-t-[#E10600] rounded-full animate-spin"></div>
+                        </div>
+                    ) : error ? (
+                        <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 text-center font-medium">
+                            {error}
+                        </div>
+                    ) : (
+                        <Outlet context={{
+                            schedule, updateAppointmentStatus, rescheduleAppointment, createAppointment,
+                            patients, addPatient, updatePatient,
+                            prescriptions, addPrescription, updatePrescriptionStatus, updatePrescription
+                        }} />
+                    )}
                 </main>
             </div>
         </div>

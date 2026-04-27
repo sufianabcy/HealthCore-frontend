@@ -4,24 +4,34 @@ const DoctorDashboard = () => {
     const { schedule, updateAppointmentStatus, patients } = useOutletContext();
     const navigate = useNavigate();
 
-    // Convert object to array for easier mapping
-    const appointmentsArray = Object.entries(schedule).map(([time, data]) => ({ time, ...data }));
+    // Convert object to array for easier mapping.
+    const appointmentsArray = Object.values(schedule);
 
-    const nextAppointment = appointmentsArray.find(a => a.status === 'next' || a.status === 'ready');
-    const upcomingAppointments = appointmentsArray.filter(a => a.status === 'upcoming');
+    const isReadyStatus = (status) => ['next', 'ready', 'active'].includes((status || '').toLowerCase());
+    const isWaitingStatus = (status) => ['pending', 'upcoming', 'next', 'ready', 'active'].includes((status || '').toLowerCase());
+    const isUpcomingStatus = (status) => ['pending', 'upcoming'].includes((status || '').toLowerCase());
+
+    const waitingAppointments = appointmentsArray.filter((a) => isWaitingStatus(a.status));
+    const nextAppointment = waitingAppointments.find((a) => isReadyStatus(a.status)) || waitingAppointments[0];
+    const upcomingAppointments = appointmentsArray.filter((a) => isUpcomingStatus(a.status));
+    const hasReadyPatient = waitingAppointments.some((a) => isReadyStatus(a.status));
 
     const totalCount = appointmentsArray.length;
-    const completedCount = appointmentsArray.filter(a => a.status === 'completed').length;
-    const waitingCount = appointmentsArray.filter(a => a.status === 'next' || a.status === 'ready' || a.status === 'upcoming').length;
+    const completedCount = appointmentsArray.filter((a) => (a.status || '').toLowerCase() === 'completed').length;
+    const waitingCount = waitingAppointments.length;
 
-    const handleStartCall = (time) => {
+    const handleStartCall = () => {
         // Option to mark as completed immediately or on the consultation page. We'll leave it to user via "Done" button elsewhere, or just navigate
         navigate('/doctor/consultation-room');
     };
 
-    const handleAdmitPatient = (time) => {
+    const handleAdmitPatient = (appointmentId) => {
         // Marks upcoming as ready/next
-        updateAppointmentStatus(time, 'next');
+        updateAppointmentStatus(appointmentId, 'NEXT');
+    };
+
+    const handleDone = (appointmentId) => {
+        updateAppointmentStatus(appointmentId, 'COMPLETED');
     };
 
     // Helper to find patient id
@@ -103,7 +113,9 @@ const DoctorDashboard = () => {
                                     <div>
                                         <div className="flex items-center gap-3 mb-1">
                                             <h4 className="text-xl font-bold">{nextAppointment.patient}</h4>
-                                            <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">Ready</span>
+                                            <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">
+                                                {isReadyStatus(nextAppointment.status) ? 'Ready' : 'Waiting'}
+                                            </span>
                                         </div>
                                         <p className="text-gray-500 font-medium text-sm flex items-center gap-2">
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -121,12 +133,20 @@ const DoctorDashboard = () => {
                                         View Profile
                                     </Link>
                                     <button
-                                        onClick={() => handleStartCall(nextAppointment.time)}
+                                        onClick={handleStartCall}
                                         className="flex-1 sm:flex-none bg-[#E10600] text-white hover:bg-red-700 px-6 py-2.5 rounded-xl font-bold shadow-sm transition-colors text-sm flex items-center justify-center gap-2"
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                                         Join Call
                                     </button>
+                                    {(nextAppointment.status || '').toLowerCase() !== 'completed' && (
+                                        <button
+                                            onClick={() => handleDone(nextAppointment.id)}
+                                            className="flex-1 sm:flex-none bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 px-6 py-2.5 rounded-xl font-bold transition-colors text-sm"
+                                        >
+                                            Done
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ) : (
@@ -168,9 +188,9 @@ const DoctorDashboard = () => {
                                                 </div>
                                             </div>
                                             <button
-                                                onClick={() => handleAdmitPatient(appt.time)}
+                                                        onClick={() => handleAdmitPatient(appt.id)}
                                                 className="w-full sm:w-auto text-sm font-bold text-[#E10600] bg-red-50 hover:bg-red-100 border border-red-100 px-5 py-2 rounded-lg transition-colors text-center"
-                                                disabled={nextAppointment !== undefined}
+                                                        disabled={hasReadyPatient}
                                             >
                                                 Admit to Room
                                             </button>

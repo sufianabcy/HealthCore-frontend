@@ -1,17 +1,40 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import patientService from '../../services/patientService';
 
 const PatientLayout = () => {
     const { logout } = useAuth();
-    // Shared state for appointments across the Patient Portal
-    const [appointments, setAppointments] = useState([
-        { id: 1, doctor: "Dr. Sarah Jenkins", date: "Oct 24, 2023", time: "10:00 AM", type: "Virtual", status: "Upcoming" },
-        { id: 2, doctor: "Dr. Michael Chen", date: "Nov 12, 2023", time: "02:30 PM", type: "In-Person", status: "Upcoming" }
-    ]);
+    const [appointments, setAppointments] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    const addAppointment = (newAppt) => {
-        setAppointments([...appointments, { id: Date.now(), ...newAppt }]);
+    // Fetch appointments from backend
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                const data = await patientService.getAppointments(0, 20);
+                setAppointments(data.content || []);
+            } catch (err) {
+                console.error('Failed to load appointments:', err);
+                setError('Failed to load data');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    const addAppointment = async (newAppt) => {
+        try {
+            const created = await patientService.bookAppointment(newAppt);
+            setAppointments(prev => [...prev, created]);
+            return created;
+        } catch (err) {
+            console.error('Failed to book appointment:', err);
+            throw err;
+        }
     };
 
     return (
@@ -59,7 +82,17 @@ const PatientLayout = () => {
 
                 {/* Page Content */}
                 <main className="flex-1 overflow-y-auto p-6 md:p-8">
-                    <Outlet context={{ appointments, addAppointment }} />
+                    {loading ? (
+                        <div className="flex items-center justify-center h-64">
+                            <div className="h-8 w-8 border-4 border-gray-200 border-t-[#E10600] rounded-full animate-spin"></div>
+                        </div>
+                    ) : error ? (
+                        <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 text-center font-medium">
+                            {error}
+                        </div>
+                    ) : (
+                        <Outlet context={{ appointments, addAppointment }} />
+                    )}
                 </main>
             </div>
         </div>

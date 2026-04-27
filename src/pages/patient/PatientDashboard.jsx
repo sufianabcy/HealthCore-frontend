@@ -66,10 +66,10 @@ const PatientDashboard = () => {
                                 <li key={appt.id} className="p-5 flex flex-col sm:flex-row justify-between sm:items-center hover:bg-gray-50 transition-colors gap-4">
                                     <div className="flex gap-4 items-center">
                                         <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-red-600 font-bold border border-red-100">
-                                            {appt.doctor.charAt(4)}
+                                            {appt.doctorName?.charAt(4) || 'D'}
                                         </div>
                                         <div>
-                                            <p className="font-bold text-gray-800">{appt.doctor}</p>
+                                            <p className="font-bold text-gray-800">{appt.doctorName}</p>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">{appt.type}</span>
                                                 <span className="text-sm text-gray-500">{appt.date} at {appt.time}</span>
@@ -77,7 +77,7 @@ const PatientDashboard = () => {
                                         </div>
                                     </div>
                                     <div className="flex gap-2 sm:flex-col sm:items-end sm:gap-1">
-                                        {appt.type === 'Virtual' ? (
+                                        {appt.type === 'Virtual' || appt.type === 'VIRTUAL' ? (
                                             <Link to="/patient/consultations" className="text-sm font-semibold text-white bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition-colors">
                                                 Join Waiting Room
                                             </Link>
