@@ -36,6 +36,25 @@ const PatientLayout = () => {
             throw err;
         }
     };
+    const deleteAppointment = async (id) => {
+        try {
+            await patientService.deleteAppointment(id);
+            setAppointments(prev => prev.filter(a => a.id !== id));
+        } catch (err) {
+            console.error('Failed to delete appointment:', err);
+            throw err;
+        }
+    };
+
+    const updateAppointmentStatus = async (id, status) => {
+        try {
+            const updated = await patientService.updateAppointmentStatus(id, status);
+            setAppointments(prev => prev.map(a => a.id === id ? updated : a));
+        } catch (err) {
+            console.error('Failed to update status:', err);
+            throw err;
+        }
+    };
 
     return (
         <div className="h-screen flex bg-gray-50 overflow-hidden text-gray-900">
@@ -91,7 +110,7 @@ const PatientLayout = () => {
                             {error}
                         </div>
                     ) : (
-                        <Outlet context={{ appointments, addAppointment }} />
+                        <Outlet context={{ appointments, addAppointment, deleteAppointment, updateAppointmentStatus }} />
                     )}
                 </main>
             </div>

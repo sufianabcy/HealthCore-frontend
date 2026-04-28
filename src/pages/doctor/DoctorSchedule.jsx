@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useOutletContext, Link, useNavigate } from 'react-router-dom';
 
 const DoctorSchedule = () => {
-    const { schedule: scheduleData, updateAppointmentStatus, rescheduleAppointment, createAppointment, patients } = useOutletContext();
+    const { schedule: scheduleData, updateAppointmentStatus, rescheduleAppointment, createAppointment, deleteAppointment, patients } = useOutletContext();
     const navigate = useNavigate();
 
     const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
@@ -19,6 +19,12 @@ const DoctorSchedule = () => {
 
     const handleDone = (appointmentId) => {
         updateAppointmentStatus(appointmentId, 'COMPLETED');
+    };
+
+    const handleDelete = (appointmentId) => {
+        if (window.confirm("Are you sure you want to delete this appointment?")) {
+            deleteAppointment(appointmentId);
+        }
     };
 
     const openRescheduleModal = (appointmentId) => {
@@ -80,7 +86,7 @@ const DoctorSchedule = () => {
                                 <th className="p-5 w-32">Time</th>
                                 <th className="p-5">Patient Details</th>
                                 <th className="p-5 w-48">Status</th>
-                                <th className="p-5 text-right w-[340px]">Quick Actions</th>
+                                <th className="p-5 text-right w-[380px]">Quick Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -137,7 +143,7 @@ const DoctorSchedule = () => {
                                                 </button>
                                             )}
 
-                                            {appt.status !== 'completed' && (
+                                            {appt.status !== 'completed' && appt.type.includes('Virtual') && (
                                                 <button
                                                     onClick={handleJoinCall}
                                                     className="text-xs font-bold bg-[#E10600] hover:bg-red-700 text-white px-4 py-2 rounded-lg transition shadow-sm flex items-center justify-center gap-1.5 focus:outline-none"
@@ -146,6 +152,13 @@ const DoctorSchedule = () => {
                                                     Join
                                                 </button>
                                             )}
+
+                                            <button
+                                                onClick={() => handleDelete(appt.id)}
+                                                className="text-xs font-bold border-red-200 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-lg transition shadow-sm border focus:outline-none"
+                                            >
+                                                Delete
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>

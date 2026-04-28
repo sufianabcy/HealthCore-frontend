@@ -1,7 +1,7 @@
 import { Link, useOutletContext } from 'react-router-dom';
 
 const PatientDashboard = () => {
-    const { appointments } = useOutletContext();
+    const { appointments, deleteAppointment, updateAppointmentStatus } = useOutletContext();
 
     return (
         <div>
@@ -72,20 +72,30 @@ const PatientDashboard = () => {
                                             <p className="font-bold text-gray-800">{appt.doctorName}</p>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">{appt.type}</span>
-                                                <span className="text-sm text-gray-500">{appt.date} at {appt.time}</span>
+                                                <span className={`text-xs ml-2 uppercase tracking-wide font-bold ${appt.status === 'completed' || appt.status === 'COMPLETED' ? 'text-gray-400' : 'text-green-600'}`}>
+                                                    {appt.status}
+                                                </span>
+                                                <span className="text-sm text-gray-500 ml-2">{appt.date} at {appt.time}</span>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex gap-2 sm:flex-col sm:items-end sm:gap-1">
-                                        {appt.type === 'Virtual' || appt.type === 'VIRTUAL' ? (
-                                            <Link to="/patient/consultations" className="text-sm font-semibold text-white bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition-colors">
-                                                Join Waiting Room
-                                            </Link>
-                                        ) : (
-                                            <span className="text-sm font-semibold text-gray-600 bg-gray-100 px-4 py-2 rounded-lg">
-                                                In-Person Visit
-                                            </span>
+                                    <div className="flex gap-2 sm:flex-row items-center justify-end">
+                                        {appt.status !== 'COMPLETED' && appt.status !== 'completed' && (
+                                            <>
+                                                {appt.type === 'Virtual' || appt.type === 'VIRTUAL' ? (
+                                                    <Link to="/patient/consultations" className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors">
+                                                        Join Call
+                                                    </Link>
+                                                ) : (
+                                                    <button onClick={() => updateAppointmentStatus(appt.id, 'COMPLETED')} className="text-sm font-semibold text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors">
+                                                        Mark Done
+                                                    </button>
+                                                )}
+                                            </>
                                         )}
+                                        <button onClick={() => deleteAppointment(appt.id)} className="text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2 rounded-lg transition-colors">
+                                            Delete
+                                        </button>
                                     </div>
                                 </li>
                             ))}

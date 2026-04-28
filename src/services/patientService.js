@@ -22,6 +22,16 @@ const patientService = {
         const response = await api.get('/patients/me/records', { params });
         return response.data.data; // PagedResponse
     },
+
+    updateAppointmentStatus: async (id, status) => {
+        const response = await api.patch(`/patients/me/appointments/${id}/status`, { status });
+        return response.data.data;
+    },
+
+    deleteAppointment: async (id) => {
+        const response = await api.delete(`/patients/me/appointments/${id}`);
+        return response.data.data;
+    },
 };
 
 export default patientService;

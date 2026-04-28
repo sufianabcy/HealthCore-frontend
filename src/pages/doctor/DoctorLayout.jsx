@@ -78,6 +78,16 @@ const DoctorLayout = () => {
         }
     };
 
+    const deleteAppointment = async (appointmentId) => {
+        try {
+            await doctorService.deleteAppointment(appointmentId);
+            await loadSchedule();
+        } catch (err) {
+            console.error('Failed to delete appointment:', err);
+            throw err;
+        }
+    };
+
     const rescheduleAppointment = async (appointmentId, newTime, newDate) => {
         try {
             await commonService.rescheduleAppointment(appointmentId, { date: newDate, time: newTime });
@@ -252,7 +262,7 @@ const DoctorLayout = () => {
                         </div>
                     ) : (
                         <Outlet context={{
-                            schedule, updateAppointmentStatus, rescheduleAppointment, createAppointment,
+                            schedule, updateAppointmentStatus, rescheduleAppointment, createAppointment, deleteAppointment,
                             patients, addPatient, updatePatient,
                             prescriptions, addPrescription, updatePrescriptionStatus, updatePrescription
                         }} />

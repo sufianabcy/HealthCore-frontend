@@ -54,6 +54,11 @@ const doctorService = {
         return response.data.data;
     },
 
+    deleteAppointment: async (appointmentId) => {
+        const response = await api.delete(`/appointments/${appointmentId}`);
+        return response.data.data;
+    },
+
     getPrescriptions: async (search = null, status = null, page = 0, size = 10) => {
         const params = { page, size };
         if (search) params.search = search;
